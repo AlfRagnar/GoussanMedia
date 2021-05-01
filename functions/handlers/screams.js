@@ -93,7 +93,7 @@ exports.commentOnScream = (req, res) => {
       if (!doc.exists) {
         return res.status(404).json({ error: "Scream not found" });
       }
-      return ref.update({
+      return doc.ref.update({
         commentCount: doc.data().commentCount + 1,
       });
     })
