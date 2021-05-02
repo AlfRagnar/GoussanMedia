@@ -17,6 +17,8 @@ const {
   uploadImage,
   addUserDetails,
   getAuthenticatedUser,
+  markNotificationsRead,
+  getUserDetails,
 } = require("./handlers/users");
 const { db } = require("./util/admin");
 
@@ -33,14 +35,15 @@ app.post("/scream/:screamId/comment", fbAuth, commentOnScream);
 // Users Routes
 app.post("/signup", signup);
 app.post("/login", login);
+app.get("/user/:handle", getUserDetails);
 // Need to be Authenticated to access
 app.post("/user/image", fbAuth, uploadImage);
 app.post("/user", fbAuth, addUserDetails);
 app.get("/user", fbAuth, getAuthenticatedUser);
+app.post("/notifications", fbAuth, markNotificationsRead);
 
-exports.api = functions.region("europe-west1").https.onRequest(app);
-
-const fireStoneInvoke = functions.region("europe-west1").firestore;
+exports.api = functions.region("europe-west3").https.onRequest(app);
+const fireStoneInvoke = functions.region("europe-west3").firestore;
 
 exports.createNotificationOnLike = fireStoneInvoke
   .document("likes/{id}")
@@ -48,7 +51,10 @@ exports.createNotificationOnLike = fireStoneInvoke
     db.doc(`/screams/${snapshot.data().screamId}`)
       .get()
       .then((doc) => {
-        if (doc.exists) {
+        if (
+          doc.exists &&
+          doc.data().userHandle !== snapshot.data().userHandle
+        ) {
           return db.doc(`/notifications/${snapshot.id}`).set({
             createdAt: new Date().toISOString(),
             recipient: doc.data().userHandle,
@@ -59,34 +65,27 @@ exports.createNotificationOnLike = fireStoneInvoke
           });
         }
       })
-      .then(() => {
-        return;
-      })
-      .catch((err) => {
-        console.error(err);
-        return;
-      });
+      .catch((err) => console.error(err));
   });
 exports.deleteNotificationOnUnLike = fireStoneInvoke
   .document("likes/{id}")
   .onDelete((snapshot) => {
-    db.doc(`/notifications/${snapshot.id}`)
+    return db
+      .doc(`/notifications/${snapshot.id}`)
       .delete()
-      .then(() => {
-        return;
-      })
-      .catch((err) => {
-        console.error(err);
-        return;
-      });
+      .catch((err) => console.error(err));
   });
 exports.createNotificationOnComment = fireStoneInvoke
   .document("comments/{id}")
   .onCreate((snapshot) => {
-    db.doc(`/screams/${snapshot.data().screamId}`)
+    return db
+      .doc(`/screams/${snapshot.data().screamId}`)
       .get()
       .then((doc) => {
-        if (doc.exists) {
+        if (
+          doc.exists &&
+          doc.data().userHandle !== snapshot.data().userHandle
+        ) {
           return db.doc(`/notifications/${snapshot.id}`).set({
             createdAt: new Date().toISOString(),
             recipient: doc.data().userHandle,
@@ -97,11 +96,5 @@ exports.createNotificationOnComment = fireStoneInvoke
           });
         }
       })
-      .then(() => {
-        return;
-      })
-      .catch((err) => {
-        console.error(err);
-        return;
-      });
+      .catch((err) => console.error(err));
   });
